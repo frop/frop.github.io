@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyBriefingButton = document.getElementById('copy-briefing-button');
 
     // --- Configuration ---
-    const N8N_BRIEFING_WEBHOOK_URL = 'http://localhost:5678/webhook/briefing/message';
+    //const N8N_BRIEFING_WEBHOOK_URL = 'http://localhost:5678/webhook/briefing/message';
+    const N8N_BRIEFING_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/briefing/message';
 
     // --- State Variables ---
     let sessionId = ''; // Session for the current briefing interaction

@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyButton = document.getElementById('copy-markdown-button');
 
     // --- Configuration ---
-    const N8N_WEBHOOK_URL = 'http://localhost:5678/webhook/one-pager/message';
+    //const N8N_WEBHOOK_URL = 'http://localhost:5678/webhook/one-pager/message';
+    const N8N_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/one-pager/message';
 
     // --- State Variables ---
     let sessionId = localStorage.getItem('onePagerSessionId');
