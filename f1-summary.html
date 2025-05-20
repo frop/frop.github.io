@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Briefing Generator</title> <!-- New Title -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-header">
+        <div class="app-title">AI Briefing Generator</div>
+        <!-- We might repurpose or hide the new-doc-button later -->
+        <div class="app-controls">
+            <button id="start-over-button" style="display:none;">Start Over</button> <!-- New button, initially hidden -->
+        </div>
+    </div>
+
+    <div id="input-one-pager-section" class="initial-input-section">
+        <h2>Provide Your Existing One-Pager</h2>
+        <textarea id="one-pager-input-area" placeholder="Paste your one-pager content here (Markdown is welcome)..."></textarea>
+        <button id="submit-one-pager-button">Load One-Pager & Start Briefing</button>
+    </div>
+
+    <div class="container" style="display:none;"> <!-- Main chat/doc UI initially hidden -->
+        <div class="chat-panel">
+            <div id="chat-messages" class="chat-messages-area"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Specify audience for briefing (e.g., 'Executives', 'Technical Team')...">
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+        <div class="one-pager-panel"> <!-- This will now display the BRIEFING -->
+            <div class="panel-header">
+                <h2 id="briefing-title">Generated Briefing</h2> <!-- Title will change based on audience -->
+                <button id="copy-briefing-button" title="Copy Briefing Markdown">Copy Briefing</button>
+            </div>
+            <div id="briefing-output-content" class="markdown-content">
+                <!-- Briefing Markdown will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script-briefing.js"></script> <!-- New JS file for this variation -->
+</body>
+</html>
