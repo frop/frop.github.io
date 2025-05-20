@@ -1,223 +1,319 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Get DOM Elements ---
-    const chatInput = document.getElementById('chat-input');
-    const sendButton = document.getElementById('send-button');
-    const chatMessagesDiv = document.getElementById('chat-messages');
-    const onePagerContentDiv = document.getElementById('one-pager-content');
-    const newDocButton = document.getElementById('new-doc-button');
-    const copyButton = document.getElementById('copy-markdown-button');
+    // --- Get Common DOM Elements ---
+    const navLinks = document.querySelectorAll('.nav-link');
+    const views = document.querySelectorAll('.view-section');
+    const newSessionButton = document.getElementById('new-session-button');
+    const appTitle = document.querySelector('.app-title'); // If we want to change it
 
-    // --- Configuration ---
-    //const N8N_WEBHOOK_URL = 'http://localhost:5678/webhook/one-pager/message';
-    const N8N_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/one-pager/message';
+    // --- URLs (Consider making these configurable) ---
+    // const N8N_ONEPAGER_WEBHOOK_URL = 'http://localhost:5678/webhook/one-pager/message';
+    // const N8N_BRIEFING_WEBHOOK_URL = 'http://localhost:5678/webhook/briefing/message';
+    const N8N_ONEPAGER_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/one-pager/message';
+    const N8N_BRIEFING_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/briefing/message';
+    const N8N_REPORT_WEBHOOK_URL = 'YOUR_N8N_REPORT_WEBHOOK_URL_HERE'; // Placeholder
 
-    // --- State Variables ---
-    let sessionId = localStorage.getItem('onePagerSessionId');
-    let currentRawMarkdown = ''; // Store the latest raw Markdown
+    // --- State (Global for the app) ---
+    let currentView = 'onepager'; // Default view
+    let sessionIds = {
+        onepager: null,
+        briefing: null,
+        report: null
+    };
+    let onePagerRawMarkdown = '';
+    let briefingRawMarkdown = '';
+    // let reportRawMarkdown = ''; // For report feature
 
-    // --- Initialize Session ID ---
-    if (!sessionId) {
-        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('onePagerSessionId', sessionId);
+    // --- Initialize Session IDs (from localStorage or new) ---
+    function initSessionId(viewName) {
+        let storedId = localStorage.getItem(`${viewName}SessionId`);
+        if (!storedId) {
+            storedId = `${viewName}_session_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem(`${viewName}SessionId`, storedId);
+        }
+        sessionIds[viewName] = storedId;
+        console.log(`Initialized ${viewName} session ID: ${sessionIds[viewName]}`);
     }
-    console.log("Initial session ID:", sessionId);
 
-    // --- UI Update Functions ---
+    // --- DOM Elements for One-Pager View ---
+    const onePagerChatInput = document.getElementById('one-pager-chat-input');
+    const onePagerSendButton = document.getElementById('one-pager-send-button');
+    const onePagerChatMessages = document.getElementById('one-pager-chat-messages');
+    const onePagerOutputContent = document.getElementById('one-pager-output-content');
+    const onePagerCopyButton = document.getElementById('one-pager-copy-button');
 
-    /**
-     * Appends a message to the chat display area.
-     * @param {string} text - The message text.
-     * @param {'user' | 'bot'} sender - Who sent the message.
-     */
-    function appendMessage(text, sender) {
+    // --- DOM Elements for Briefing View ---
+    const briefingInputSection = document.getElementById('briefing-input-one-pager-section');
+    const briefingOnePagerInputArea = document.getElementById('briefing-one-pager-input-area');
+    const briefingSubmitOnePagerButton = document.getElementById('briefing-submit-one-pager-button');
+    const briefingMainUI = document.getElementById('briefing-main-ui');
+    const briefingChatInput = document.getElementById('briefing-chat-input');
+    const briefingSendButton = document.getElementById('briefing-send-button');
+    const briefingChatMessages = document.getElementById('briefing-chat-messages');
+    const briefingTitleElement = document.getElementById('briefing-title');
+    const briefingOutputContent = document.getElementById('briefing-output-content');
+    const briefingCopyButton = document.getElementById('briefing-copy-button');
+
+    // --- Helper: Append Message to a specific chat area ---
+    function appendMessage(text, sender, chatAreaElement) {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', `${sender}-message`);
-        messageDiv.textContent = text; // Using textContent is safer for user-generated content
-        chatMessagesDiv.appendChild(messageDiv);
-        // Auto-scroll to the bottom
-        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+        messageDiv.textContent = text;
+        chatAreaElement.appendChild(messageDiv);
+        chatAreaElement.scrollTop = chatAreaElement.scrollHeight;
     }
 
-    /**
-     * Renders Markdown content into the one-pager panel using marked.js
-     * and updates the currentRawMarkdown state.
-     * @param {string | null} markdownContent - The raw Markdown string, or null to clear.
-     */
-    function renderOnePager(markdownContent) {
-        // Store the raw markdown (or empty string if null/undefined)
-        currentRawMarkdown = markdownContent || '';
-        console.log("renderOnePager called. Raw Markdown stored:", currentRawMarkdown ? currentRawMarkdown.substring(0, 50) + '...' : '(empty)'); // Log stored value
+    // --- Helper: Render Markdown to a specific output area ---
+    function renderMarkdown(markdownContent, outputAreaElement, rawMarkdownStorageVarName) {
+        // Store raw markdown
+        if (rawMarkdownStorageVarName === 'onePager') onePagerRawMarkdown = markdownContent || '';
+        else if (rawMarkdownStorageVarName === 'briefing') briefingRawMarkdown = markdownContent || '';
+        // else if (rawMarkdownStorageVarName === 'report') reportRawMarkdown = markdownContent || '';
 
-        // Debugging logs for marked.js availability
-        console.log("Is marked an object?", typeof marked === 'object');
-        if (typeof marked === 'object') {
-            console.log("Is marked.parse a function?", typeof marked.parse === 'function');
-        }
+        const contentToRender = markdownContent || '';
 
-        // Attempt to render using marked.js
-        if (currentRawMarkdown && typeof marked === 'object' && typeof marked.parse === 'function') {
+        if (contentToRender && typeof marked === 'object' && typeof marked.parse === 'function') {
             try {
-                const htmlContent = marked.parse(currentRawMarkdown);
-                // console.log("Parsed HTML:", htmlContent); // Optional: log parsed HTML
-                onePagerContentDiv.innerHTML = htmlContent;
+                outputAreaElement.innerHTML = marked.parse(contentToRender);
             } catch (e) {
-                console.error("Error during marked.parse():", e);
-                onePagerContentDiv.textContent = "Error parsing Markdown. Raw content:\n" + currentRawMarkdown; // Display error and raw content
+                console.error(`Error parsing Markdown for ${rawMarkdownStorageVarName}:`, e);
+                outputAreaElement.textContent = `Error parsing. Raw: ${contentToRender}`;
             }
-        } else if (currentRawMarkdown) {
-            // Fallback to displaying raw text if marked.js is not available or content exists
-            console.warn("Falling back to textContent (marked.js might not be loaded correctly or markdownContent is just text).");
-            onePagerContentDiv.textContent = currentRawMarkdown;
+        } else if (contentToRender) {
+            outputAreaElement.textContent = contentToRender;
         } else {
-            // Clear the panel if markdownContent is null or empty
-            console.log("Clearing onePagerContentDiv.");
-            onePagerContentDiv.innerHTML = '';
+            outputAreaElement.innerHTML = ''; // Clear if no content
         }
     }
 
-    // --- Communication with n8n Backend ---
 
-    /**
-     * Sends user input to the n8n webhook and handles the response.
-     * @param {string} userInput - The text entered by the user.
-     */
-    async function sendMessageToN8n(userInput) {
-        // Avoid echoing certain system/auto-generated messages
-        if (userInput && userInput.toLowerCase() !== "start" && !userInput.startsWith("Error:")) {
-                appendMessage(userInput, 'user');
+    // --- View Switching Logic ---
+    function setActiveView(viewId) {
+        views.forEach(view => {
+            view.classList.remove('active-view');
+            if (view.id === viewId + '-view') {
+                view.classList.add('active-view');
+            }
+        });
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.id === 'nav-' + viewId) {
+                link.classList.add('active');
+            }
+        });
+        currentView = viewId;
+        appTitle.textContent = `AI Document Assistant - ${viewId.charAt(0).toUpperCase() + viewId.slice(1)}`;
+
+        // Handle view-specific initializations or UI states
+        if (viewId === 'briefing') {
+            const storedOnePager = localStorage.getItem('briefingOriginalOnePager');
+            if (!storedOnePager) {
+                briefingInputSection.style.display = 'block'; // Or 'flex'
+                briefingMainUI.style.display = 'none';
+                briefingOnePagerInputArea.focus();
+            } else {
+                briefingInputSection.style.display = 'none';
+                briefingMainUI.style.display = 'flex';
+                // Optionally send a "resume" message or prompt for audience
+                appendMessage("Loaded existing one-pager for briefing. Specify target audience.", 'bot', briefingChatMessages);
+                briefingChatInput.focus();
+            }
+        } else if (viewId === 'onepager') {
+            // appendMessage("Welcome to One-Pager! Type 'start'.", 'bot', onePagerChatMessages); // If needed
+            onePagerChatInput.focus();
         }
-        chatInput.value = ''; // Clear input field
-        // Consider adding a loading indicator here
+        console.log("Active view set to:", currentView);
+        // Ensure session ID for the current view is initialized
+        if (!sessionIds[currentView]) {
+            initSessionId(currentView);
+        }
+    }
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', (event) => {
+            event.preventDefault(); // Prevent default hash jump
+            const viewId = link.id.replace('nav-', '');
+            setActiveView(viewId);
+        });
+    });
+
+    // --- New Session Button Logic ---
+    newSessionButton.addEventListener('click', () => {
+        console.log(`New Session clicked for view: ${currentView}`);
+        // Generate new session ID for the current view
+        const newId = `${currentView}_session_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem(`${currentView}SessionId`, newId);
+        sessionIds[currentView] = newId;
+        console.log(`New ${currentView} session ID: ${sessionIds[currentView]}`);
+
+        if (currentView === 'onepager') {
+            onePagerChatMessages.innerHTML = '';
+            renderMarkdown(null, onePagerOutputContent, 'onePager');
+            sendMessageToOnePagerN8n("start"); // Auto-send "start"
+            onePagerChatInput.focus();
+        } else if (currentView === 'briefing') {
+            briefingChatMessages.innerHTML = '';
+            renderMarkdown(null, briefingOutputContent, 'briefing');
+            localStorage.removeItem('briefingOriginalOnePager'); // Clear stored one-pager for briefing
+            briefingOnePagerInputArea.value = '';
+            briefingInputSection.style.display = 'block'; // Or 'flex'
+            briefingMainUI.style.display = 'none';
+            briefingTitleElement.textContent = 'Generated Briefing';
+            briefingOnePagerInputArea.focus();
+        } else if (currentView === 'report') {
+            // Reset report view if implemented
+            // reportChatMessages.innerHTML = '';
+            // renderMarkdown(null, reportOutputContent, 'report');
+        }
+    });
+
+    // --- One-Pager Feature Logic ---
+    async function sendMessageToOnePagerN8n(userInput) {
+        // ... (similar to your original sendMessageToN8n for one-pager)
+        // - Use N8N_ONEPAGER_WEBHOOK_URL
+        // - Use sessionIds.onepager
+        // - Append messages to onePagerChatMessages
+        // - Render output to onePagerOutputContent using 'onePager' as storage key
+        // - Payload should be { userInput, sessionId: sessionIds.onepager }
+        // - Response expected: { chatReply, onePagerContent }
+
+        if (userInput.toLowerCase() !== "start") {
+            appendMessage(userInput, 'user', onePagerChatMessages);
+        }
+        onePagerChatInput.value = '';
 
         try {
-            console.log(`Sending to n8n with sessionId: ${sessionId}, userInput: ${userInput}`); // Log outgoing request
-            const response = await fetch(N8N_WEBHOOK_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    userInput: userInput,
-                    sessionId: sessionId // Pass the current session ID
-                })
+            console.log("Sending message to One-Pager N8n:", JSON.stringify({ userInput: userInput, sessionId: sessionIds.onepager }));
+            const response = await fetch(N8N_ONEPAGER_WEBHOOK_URL, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ userInput: userInput, sessionId: sessionIds.onepager })
             });
-
-                // Consider removing loading indicator here
-
-            if (!response.ok) {
-                // Handle HTTP errors from n8n
-                const errorText = await response.text();
-                console.error('Error from n8n:', response.status, errorText);
-                appendMessage(`Error: ${response.status}. Failed to get response from assistant.`, 'bot');
-                return; // Stop processing on error
-            }
-
+            if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
             const data = await response.json();
-            console.log("Received from n8n:", data); // Log incoming response
-
-            // Update chat with bot's reply
-            if (data.chatReply) {
-                appendMessage(data.chatReply, 'bot');
-            }
-
-            // Update the one-pager panel (renderOnePager handles null/undefined)
-            if (data.onePagerContent !== undefined) {
-                    renderOnePager(data.onePagerContent);
-            }
-            // Note: If n8n sends neither chatReply nor onePagerContent, nothing happens visually on the frontend.
-
+            if (data.chatReply) appendMessage(data.chatReply, 'bot', onePagerChatMessages);
+            if (data.onePagerContent !== undefined) renderMarkdown(data.onePagerContent, onePagerOutputContent, 'onePager');
         } catch (error) {
-            // Handle network errors or other issues with the fetch call
-            console.error('Error sending/receiving message:', error);
-            appendMessage('Network error or issue connecting to the assistant. Please check console and try again.', 'bot');
-                // Consider removing loading indicator here
+            console.error("Error in sendMessageToOnePagerN8n:", error);
+            appendMessage("Error connecting to One Pager assistant.", 'bot', onePagerChatMessages);
         }
     }
 
-    // --- Event Listeners ---
-
-    // Send button click
-    sendButton.addEventListener('click', () => {
-        const userInput = chatInput.value.trim();
-        if (userInput) {
-            sendMessageToN8n(userInput);
-        }
-    });
-
-    // Enter key in chat input
-    chatInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            const userInput = chatInput.value.trim();
-            if (userInput) {
-                sendMessageToN8n(userInput);
-            }
-        }
-    });
-
-    // New One-Pager button click
-    if (newDocButton) {
-        newDocButton.addEventListener('click', () => {
-            console.log("New Document button clicked.");
-            // 1. Generate and store a new session ID
-            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-            localStorage.setItem('onePagerSessionId', sessionId);
-            console.log("NEW SESSION STARTED. ID:", sessionId);
-
-            // 2. Clear the UI (renderOnePager(null) also clears currentRawMarkdown)
-            renderOnePager(null);
-            chatMessagesDiv.innerHTML = '';
-
-            // 3. Send "start" to n8n to initialize the new session
-            sendMessageToN8n("start");
-
-            // Focus the input field
-            chatInput.focus();
+    if (onePagerSendButton) {
+        onePagerSendButton.addEventListener('click', () => {
+            const userInput = onePagerChatInput.value.trim();
+            if (userInput) sendMessageToOnePagerN8n(userInput);
         });
-    } else {
-        console.warn("New Document button not found.");
+        onePagerChatInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') {
+                const userInput = onePagerChatInput.value.trim();
+                if (userInput) sendMessageToOnePagerN8n(userInput);
+            }
+        });
+    }
+    if (onePagerCopyButton) {
+        onePagerCopyButton.addEventListener('click', () => {
+            if (!onePagerRawMarkdown) { /* Handle no content */ return; }
+            navigator.clipboard.writeText(onePagerRawMarkdown).then(() => { /* Feedback */ }).catch(err => { /* Error */});
+        });
     }
 
-    // Copy Markdown button click
-    if (copyButton) {
-        copyButton.addEventListener('click', () => {
-            if (!currentRawMarkdown) {
-                console.warn("Copy button clicked, but no markdown content available.");
-                // Optionally provide feedback that there's nothing to copy
-                copyButton.textContent = 'Nothing to Copy';
-                    setTimeout(() => { copyButton.textContent = 'Copy MD'; }, 1000);
-                return;
-            }
 
-            navigator.clipboard.writeText(currentRawMarkdown).then(() => {
-                // Success feedback
-                const originalText = copyButton.textContent; // Might not be 'Copy MD' if recently clicked
-                    if (copyButton.textContent !== 'Copied!') { // Avoid resetting if clicked rapidly
-                        copyButton.dataset.originalText = 'Copy MD'; // Store original
-                    }
-                copyButton.textContent = 'Copied!';
-                copyButton.classList.add('copied');
-                console.log("Markdown copied to clipboard.");
+    // --- Briefing Feature Logic ---
+    async function sendToBriefingN8n(userInput, initialOnePager = null) {
+        // ... (similar to your script-briefing.js sendToN8nForBriefing)
+        // - Use N8N_BRIEFING_WEBHOOK_URL
+        // - Use sessionIds.briefing
+        // - `originalOnePagerContent` comes from localStorage.getItem('briefingOriginalOnePager')
+        // - Append messages to briefingChatMessages
+        // - Render output to briefingOutputContent using 'briefing' as storage key
+        // - Payload: { userInput, sessionId: sessionIds.briefing, originalOnePagerContent }
+        // - Response expected: { chatReply, briefingTitle, briefingContent }
+        const originalOnePager = localStorage.getItem('briefingOriginalOnePager');
+        if (!originalOnePager && !initialOnePager) {
+             appendMessage("Error: No one-pager loaded for briefing.", 'bot', briefingChatMessages); return;
+        }
 
-                // Revert button text and style after a short delay
-                setTimeout(() => {
-                    copyButton.textContent = copyButton.dataset.originalText || 'Copy MD';
-                    copyButton.classList.remove('copied');
-                }, 1500); // Revert after 1.5 seconds
+        const payload = {
+            userInput: userInput,
+            sessionId: sessionIds.briefing,
+            originalOnePagerContent: initialOnePager || originalOnePager
+        };
 
-            }).catch(err => {
-                // Error feedback
-                console.error('Failed to copy Markdown to clipboard: ', err);
-                alert('Could not copy text. Check browser permissions or console for errors.');
+        briefingSendButton.disabled = true; briefingChatInput.disabled = true;
+
+        try {
+            const response = await fetch(N8N_BRIEFING_WEBHOOK_URL, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
             });
-        });
-    } else {
-        console.warn("Copy Markdown button not found.");
+            briefingSendButton.disabled = false; briefingChatInput.disabled = false; briefingChatInput.focus();
+            if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+            const data = await response.json();
+            if (data.chatReply) appendMessage(data.chatReply, 'bot', briefingChatMessages);
+            if (data.briefingTitle) briefingTitleElement.textContent = data.briefingTitle;
+            if (data.briefingContent !== undefined) renderMarkdown(data.briefingContent, briefingOutputContent, 'briefing');
+        } catch (error) {
+            console.error("Error in sendToBriefingN8n:", error);
+            appendMessage("Error connecting to Briefing assistant.", 'bot', briefingChatMessages);
+            briefingSendButton.disabled = false; briefingChatInput.disabled = false;
+        }
     }
 
-    // --- Initial Load ---
-    // Optional: You could add logic here to fetch the state for the existing sessionId
-    // or display a welcome message, but currently it waits for user input ("start").
-        appendMessage("Welcome! Type 'start' to begin a new one-pager, or continue where you left off if you have an existing session.", 'bot');
-        chatInput.focus();
+    if (briefingSubmitOnePagerButton) {
+        briefingSubmitOnePagerButton.addEventListener('click', () => {
+            const onePagerContent = briefingOnePagerInputArea.value.trim();
+            if (!onePagerContent) { alert("Please paste one-pager content."); return; }
+            localStorage.setItem('briefingOriginalOnePager', onePagerContent);
+            if (!sessionIds.briefing) initSessionId('briefing'); // Ensure session ID exists
 
+            briefingInputSection.style.display = 'none';
+            briefingMainUI.style.display = 'flex';
+            briefingChatMessages.innerHTML = ''; // Clear previous chat
+            renderMarkdown(null, briefingOutputContent, 'briefing'); // Clear previous briefing
+            briefingTitleElement.textContent = 'Generated Briefing';
+            appendMessage("One-pager loaded. Specify target audience (e.g., 'Executives').", 'bot', briefingChatMessages);
+            briefingChatInput.focus();
+        });
+    }
+
+    if (briefingSendButton) {
+        briefingSendButton.addEventListener('click', () => {
+            const userInput = briefingChatInput.value.trim();
+            if (userInput) {
+                 appendMessage(userInput, 'user', briefingChatMessages);
+                 briefingChatInput.value = '';
+                 sendToBriefingN8n(userInput);
+            }
+        });
+        briefingChatInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') {
+                const userInput = briefingChatInput.value.trim();
+                if (userInput) {
+                    appendMessage(userInput, 'user', briefingChatMessages);
+                    briefingChatInput.value = '';
+                    sendToBriefingN8n(userInput);
+                }
+            }
+        });
+    }
+    if (briefingCopyButton) {
+        briefingCopyButton.addEventListener('click', () => {
+            if (!briefingRawMarkdown) { /* Handle no content */ return; }
+            navigator.clipboard.writeText(briefingRawMarkdown).then(() => { /* Feedback */ }).catch(err => { /* Error */});
+        });
+    }
+
+
+    // --- Report Feature Logic (Placeholder) ---
+    // TODO: Implement when ready
+
+
+    // --- Initial App Load ---
+    initSessionId('onepager'); // Initialize session ID for the default view
+    initSessionId('briefing');
+    initSessionId('report');
+    setActiveView('onepager'); // Set default view on load
+    // Check if briefing one-pager is in localStorage and adjust briefing view
+    const storedBriefingOnePager = localStorage.getItem('briefingOriginalOnePager');
+    if (storedBriefingOnePager) {
+        briefingOnePagerInputArea.value = storedBriefingOnePager;
+    }
 }); // End of DOMContentLoaded

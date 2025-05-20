@@ -3,39 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI One-Pager Assistant</title>
+    <title>AI Document Assistant</title> <!-- More generic title -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-header">
-        <div class="app-title">AI One-Pager Assistant</div>
+        <div class="app-title">AI Document Assistant</div>
+        <nav class="app-nav">
+            <a href="#onepager" id="nav-onepager" class="nav-link active">One Pager</a>
+            <a href="#briefing" id="nav-briefing" class="nav-link">Briefing</a>
+            <a href="#report" id="nav-report" class="nav-link">Report</a>
+        </nav>
         <div class="app-controls">
-            <button id="new-doc-button">New One-Pager</button>
-        </div>
-    </div>
-    <div class="container">
-        <div class="chat-panel">
-            <div id="chat-messages" class="chat-messages-area">
-                <!-- Chat messages will be appended here -->
-            </div>
-            <div class="chat-input-area">
-                <input type="text" id="chat-input" placeholder="Type your message...">
-                <button id="send-button">Send</button>
-            </div>
-        </div>
-        <div class="one-pager-panel">
-            <div class="panel-header">
-                <h2>Project One-Pager</h2>
-                <button id="copy-markdown-button" title="Copy Markdown Source">Copy to Clipboard</button>
-            </div>
-
-            <div id="one-pager-content" class="markdown-content">
-                <!-- Markdown will be rendered here -->
-            </div>
+            <!-- This button might be dynamic or we add more later -->
+            <button id="new-session-button">New Session</button>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script> <!-- For Markdown rendering -->
-    <script src="script.js"></script>
+    <!-- Section for "One Pager" feature -->
+    <div id="onepager-view" class="view-section active-view">
+        <div class="container">
+            <div class="chat-panel" id="one-pager-chat-panel">
+                <div id="one-pager-chat-messages" class="chat-messages-area"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="one-pager-chat-input" placeholder="Type 'start' or your refinement...">
+                    <button id="one-pager-send-button">Send</button>
+                </div>
+            </div>
+            <div class="one-pager-panel" id="one-pager-output-panel">
+                <div class="panel-header">
+                    <h2>Project One-Pager</h2>
+                    <button id="one-pager-copy-button" title="Copy One-Pager Markdown">Copy to Clipboard</button>
+                </div>
+                <div id="one-pager-output-content" class="markdown-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section for "Briefing" feature -->
+    <div id="briefing-view" class="view-section">
+        <div id="briefing-input-one-pager-section" class="initial-input-section">
+            <h2>Provide Your Existing One-Pager for Briefing</h2>
+            <textarea id="briefing-one-pager-input-area" placeholder="Paste your one-pager content here..."></textarea>
+            <button id="briefing-submit-one-pager-button">Load One-Pager & Start Briefing</button>
+        </div>
+        <div class="container" id="briefing-main-ui" style="display:none;"> <!-- Initially hidden -->
+            <div class="chat-panel" id="briefing-chat-panel">
+                <div id="briefing-chat-messages" class="chat-messages-area"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="briefing-chat-input" placeholder="Specify audience for briefing...">
+                    <button id="briefing-send-button">Send</button>
+                </div>
+            </div>
+            <div class="one-pager-panel" id="briefing-output-panel"> <!-- Re-using class, specific ID -->
+                <div class="panel-header">
+                    <h2 id="briefing-title">Generated Briefing</h2>
+                    <button id="briefing-copy-button" title="Copy Briefing Markdown">Copy Briefing</button>
+                </div>
+                <div id="briefing-output-content" class="markdown-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section for "Report" feature (Placeholder for now) -->
+    <div id="report-view" class="view-section">
+        <div class="placeholder-content">
+            <h2>Report Generator</h2>
+            <p>This feature is coming soon!</p>
+            <!-- Add input fields for report generation later -->
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script.js"></script> <!-- We'll use one main script.js and make it modular -->
 </body>
 </html>

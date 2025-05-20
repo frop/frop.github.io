@@ -1,297 +1,191 @@
-/* General Body and HTML Reset/Setup */
+/* --- General Reset & Page Setup --- */
 html {
-    box-sizing: border-box; /* Makes padding and border part of the element's total width and height */
+    box-sizing: border-box;
+    height: 100%; /* ADDED */
 }
 *, *:before, *:after {
     box-sizing: inherit;
 }
 
 body {
-    font-family: sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     margin: 0;
-    background-color: #f4f4f4;
-    /* Remove flex properties that were centering everything vertically and horizontally */
-    /* display: flex; */
-    /* justify-content: center; */
-    /* align-items: center; */
-    min-height: 100vh;
+    background-color: #f0f2f5;
+    color: #333;
+    line-height: 1.5;
+    height: 100%; /* ADDED */
+    display: flex; /* ADDED */
+    flex-direction: column; /* ADDED: Stacks header and active-view */
 }
 
+/* --- App Header & Navigation --- */
 .app-header {
-    background-color: #333; /* Dark header background */
-    color: white;
-    padding: 15px 5vw; /* Padding: vertical, horizontal (use vw for responsive side padding) */
+    background-color: #ffffff;
+    color: #333;
+    padding: 0 30px;
     display: flex;
-    justify-content: space-between; /* Key for title left, button right */
+    justify-content: space-between;
     align-items: center;
-    width: 100%; /* Make header span full width */
-    /* position: fixed; /* Uncomment for a sticky header */
+    width: 100%;
+    height: 64px;
+    border-bottom: 1px solid #e0e0e0;
+    /* position: sticky; // Can be sticky or static, static is simpler for height calcs */
     /* top: 0; */
-    /* left: 0; */
     /* z-index: 1000; */
-    /* box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow for fixed header */
+    flex-shrink: 0; /* ADDED: Prevent header from shrinking */
+}
+/* ... (Keep .app-title, .app-nav, .nav-link, .app-controls, #new-session-button styles as they were) ... */
+.app-title { font-size: 1.6em; font-weight: 600; color: #1a73e8; }
+.app-nav { display: flex; gap: 8px; flex-grow: 1; justify-content: center; margin: 0 20px; }
+.nav-link { color: #5f6368; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-weight: 500; transition: background-color 0.2s ease, color 0.2s ease; }
+.nav-link:hover { background-color: #f1f3f4; color: #1a73e8; }
+.nav-link.active { color: #1a73e8; border-bottom: 2px solid #1a73e8; border-radius: 4px 4px 0 0; background-color: transparent; }
+.app-controls { /* Controls like "New Session" button */ }
+#new-session-button { padding: 8px 16px; background-color: #e8f0fe; color: #1a73e8; border: 1px solid #dadce0; border-radius: 4px; cursor: pointer; font-size: 0.9em; font-weight: 500; transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease; }
+#new-session-button:hover { background-color: #d2e3fc; box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); }
+
+
+/* --- View Management --- */
+.view-section {
+    display: none;
+    width: 100%;
+    flex-grow: 1; /* Takes remaining vertical space from body */
+    overflow: hidden; /* ADDED: Crucial to contain its children */
+    /* This parent will define the height context for the .container */
 }
 
-.app-title {
-    font-size: 1.4em; /* Adjust as needed */
-    font-weight: bold;
+.view-section.active-view {
+    display: flex; /* Use flex to allow .container inside to be managed */
+    flex-direction: column; /* Stack elements within the view if necessary (e.g. input section + container) */
+    /* align-items: center; // We want .container to stretch, not just center */
 }
 
-.app-controls {
-    /* No longer needs width or text-align as flexbox on parent handles it */
-    /* margin-bottom: 10px; /* Remove if previously set, not needed here */
-}
-
-#new-doc-button {
-    padding: 10px 18px; /* Slightly larger padding */
-    background-color: #007bff; /* Primary blue */
-    color: white;
-    border: none;
-    border-radius: 5px; /* Slightly more rounded */
-    cursor: pointer;
-    font-size: 0.9em;
-    font-weight: 500;
-    transition: background-color 0.2s ease-in-out;
-}
-
-#new-doc-button:hover {
-    background-color: #0056b3;
-}
-
+/* --- Main Content Container (shared by views) --- */
 .container {
-    display: flex;
-    width: 90vw;
-    max-width: 1200px;
-    /* If header is fixed, use height: calc(100vh - HEADER_HEIGHT - MARGINS_BELOW_HEADER);
-       If header is static, this can be simpler or also calculated.
-       For now, let's assume static header. */
-    height: 85vh; /* Adjust if needed */
-    box-shadow: 0 0 15px rgba(0,0,0,0.15); /* Slightly softer shadow */
-    background-color: white;
-    margin: 20px auto; /* Top/bottom margin, and auto left/right to center it */
-    border-radius: 8px; /* Optional: rounded corners for the main container */
-    overflow: hidden; /* Important if using border-radius on container with child borders */
+    display: flex; /* It's a flex row for chat-panel and one-pager-panel */
+    width: 95vw; /* Or 100% if you want it to fill .active-view width */
+    max-width: 1400px;
+    height: 100%; /* ADDED: Take full height of parent (.active-view or .view-section) */
+    background-color: #ffffff;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    /* overflow: hidden; // Already on .view-section. Can be here too for safety. */
+    margin: 0 auto; /* Center horizontally IF .active-view is not stretching it to full width */
+    /* If .active-view has padding-top, this container might not need margin-top */
 }
 
+/* --- Initial Input Section (for Briefing) --- */
+.initial-input-section {
+    width: 90%;
+    max-width: 700px;
+    margin: 20px auto; /* This section will be centered within its part of active-view */
+    padding: 30px;
+    background-color: #ffffff;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    text-align: center;
+    flex-shrink: 0; /* If it's a sibling to a flex-grow container */
+}
+/* ... (Keep styles for children of .initial-input-section: h2, textarea, button) ... */
+.initial-input-section h2 { margin-top: 0; margin-bottom: 25px; font-size: 1.5em; color: #3c4043; font-weight: 500; }
+#briefing-one-pager-input-area { width: 100%; min-height: 250px; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; font-family: inherit; font-size: 0.95em; line-height: 1.6; margin-bottom: 20px; }
+#briefing-submit-one-pager-button { padding: 10px 24px; background-color: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: 500; transition: background-color 0.2s ease, box-shadow 0.2s ease; }
+#briefing-submit-one-pager-button:hover { background-color: #185abc; box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); }
+
+
+/* --- Chat Panel --- */
 .chat-panel {
-    width: 40%;
-    border-right: 1px solid #e0e0e0; /* Lighter border */
+    width: 35%;
+    min-width: 300px;
+    border-right: 1px solid #e0e0e0;
     display: flex;
     flex-direction: column;
+    background-color: #f8f9fa;
+    height: 100%; /* ADDED: Take full height of .container */
+    overflow: hidden; /* ADDED: Contain its children */
 }
 
-.one-pager-panel {
-    width: 60%;
-    padding: 25px; /* Increased padding */
-    overflow-y: auto;
-}
-
-/* Styles for the container holding the panel title and copy button */
-.panel-header {
-    display: flex;              /* Enable flexbox */
-    justify-content: space-between; /* Push title left, button right */
-    align-items: center;       /* Align items vertically */
-    margin-bottom: 15px;        /* Space below the header */
-    padding-bottom: 10px;       /* Space below the elements */
-    border-bottom: 1px solid #eee; /* Visual separator */
-}
-
-/* Reset default margins on the H2 inside the new header */
-.panel-header h2 {
-    margin: 0;
-    padding: 0;
-    border: none; /* Remove border if previously applied directly */
-    font-size: 1.6em; /* Keep or adjust size */
-}
-
-/* Style the new copy button */
-#copy-markdown-button {
-    padding: 5px 10px; /* Make it relatively small */
-    font-size: 0.8em;
-    background-color: #6c757d; /* Secondary / grey color */
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-    margin-left: 10px; /* Add some space if title gets long */
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-#copy-markdown-button:hover {
-    background-color: #5a6268;
-}
-
-#copy-markdown-button:active {
-    transform: scale(0.95); /* Give feedback on click */
-}
-
-/* Optional: Style for 'Copied!' state */
-#copy-markdown-button.copied {
-    background-color: #28a745; /* Green */
-}
 .chat-messages-area {
-    flex-grow: 1;
-    padding: 15px; /* Increased padding */
-    overflow-y: auto;
-    border-bottom: 1px solid #e0e0e0; /* Lighter border */
+    flex-grow: 1; /* Takes available vertical space in .chat-panel */
+    padding: 20px;
+    overflow-y: auto; /* Makes THIS area scrollable */
 }
 
 .chat-input-area {
     display: flex;
-    padding: 15px; /* Increased padding */
-    background-color: #f9f9f9; /* Slight background for input area */
-    border-top: 1px solid #e0e0e0; /* If chat-messages-area doesn't have bottom border */
+    padding: 15px 20px;
+    border-top: 1px solid #e0e0e0;
+    background-color: #ffffff;
+    flex-shrink: 0; /* Prevents this area from shrinking */
 }
 
-#chat-input {
-    flex-grow: 1;
-    padding: 10px; /* Increased padding */
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 0.95em;
+/* --- One-Pager/Briefing Output Panel --- */
+.one-pager-panel {
+    width: 65%;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* ADDED: Take full height of .container */
+    overflow: hidden; /* ADDED: Contain its children */
 }
 
-#send-button {
-    padding: 10px 18px; /* Match new-doc-button a bit more */
-    margin-left: 10px;
-    background-color: #007bff; /* Primary blue */
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s ease-in-out;
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px 15px 30px;
+    border-bottom: 1px solid #e8eaed;
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+/* ... (Keep .panel-header h2 styles) ... */
+.panel-header h2 { margin: 0; padding: 0; border: none; font-size: 1.4em; font-weight: 500; color: #3c4043; }
+
+
+/* The actual content div that holds the markdown output */
+#one-pager-output-content,
+#briefing-output-content {
+    flex-grow: 1; /* Make this content area take available vertical space */
+    overflow-y: auto; /* Make THIS specific area scrollable */
+    padding: 20px 30px;
 }
 
-#send-button:hover {
-    background-color: #0056b3;
-}
+/* ... (Keep styles for copy buttons, chat inputs, send buttons, message bubbles) ... */
+#one-pager-copy-button, #briefing-copy-button { padding: 6px 12px; font-size: 0.85em; background-color: #f1f3f4; color: #3c4043; border: 1px solid #dadce0; border-radius: 4px; cursor: pointer; font-weight: 500; margin-left: 10px; transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease; }
+#one-pager-copy-button:hover, #briefing-copy-button:hover { background-color: #e8eaed; border-color: #c6c6c6; box-shadow: 0 1px 1px 0 rgba(60,64,67,0.08); }
+#one-pager-copy-button:active, #briefing-copy-button:active { transform: scale(0.96); }
+#one-pager-copy-button.copied, #briefing-copy-button.copied { background-color: #e6f4ea; color: #137333; border-color: #a8dAB3; }
+#one-pager-chat-input, #briefing-chat-input { flex-grow: 1; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 0.9em; margin-right: 10px; }
+#one-pager-chat-input:focus, #briefing-chat-input:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+#one-pager-send-button, #briefing-send-button { padding: 10px 18px; background-color: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background-color 0.2s ease, box-shadow 0.2s ease; }
+#one-pager-send-button:hover, #briefing-send-button:hover { background-color: #185abc; box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); }
+#one-pager-send-button:disabled, #briefing-send-button:disabled { background-color: #e0e0e0; cursor: not-allowed; }
+.message { margin-bottom: 12px; padding: 10px 14px; border-radius: 18px; line-height: 1.4; max-width: 85%; word-wrap: break-word; }
+.user-message { background-color: #1a73e8; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+.bot-message { background-color: #f1f3f4; color: #202124; margin-right: auto; border-bottom-left-radius: 4px; }
 
-.message {
-    margin-bottom: 12px; /* More spacing */
-    padding: 10px 12px; /* More padding */
-    border-radius: 8px; /* More rounded */
-    line-height: 1.4;
-    max-width: 80%; /* Slightly wider messages */
-}
 
-.user-message {
-    background-color: #d1eaff; /* Lighter blue */
-    color: #004085; /* Darker blue text for contrast */
-    text-align: right;
-    margin-left: auto;
-}
+/* --- Markdown Content Styling (Keep existing and refine as needed) --- */
+.markdown-content { line-height: 1.7; color: #3c4043; }
+.markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4 { color: #202124; margin-top: 1.8em; margin-bottom: 0.8em; font-weight: 500; }
+.markdown-content h1:first-child, .markdown-content h2:first-child, .markdown-content h3:first-child, .markdown-content h4:first-child { margin-top: 0; }
+.markdown-content h1 { font-size: 2em; border-bottom: 1px solid #e8eaed; padding-bottom: 0.4em; }
+.markdown-content h2 { font-size: 1.5em; border-bottom: 1px solid #e8eaed; padding-bottom: 0.3em; }
+.markdown-content h3 { font-size: 1.25em; }
+.markdown-content h4 { font-size: 1.1em; }
+.markdown-content p { margin-bottom: 1em; }
+.markdown-content ul, .markdown-content ol { margin-bottom: 1em; padding-left: 25px; }
+.markdown-content li { margin-bottom: 0.5em; }
+.markdown-content a { color: #1a73e8; text-decoration: none; }
+.markdown-content a:hover { text-decoration: underline; }
+.markdown-content code { background-color: #f1f3f4; padding: 0.2em 0.5em; border-radius: 4px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size: 0.9em; color: #202124; }
+.markdown-content pre { background-color: #f8f9fa; border: 1px solid #e8eaed; padding: 1em; border-radius: 4px; overflow-x: auto; line-height: 1.45; }
+.markdown-content pre code { background-color: transparent; padding: 0; font-size: 0.9em; }
+.markdown-content blockquote { border-left: 3px solid #1a73e8; padding-left: 1.5em; margin-left: 0; margin-right: 0; color: #5f6368; font-style: italic; }
+.markdown-content table { border-collapse: collapse; width: 100%; margin-bottom: 1.5em; border: 1px solid #e0e0e0; }
+.markdown-content th, .markdown-content td { border: 1px solid #e0e0e0; padding: 10px 12px; text-align: left; }
+.markdown-content th { background-color: #f8f9fa; font-weight: 500; }
 
-.bot-message {
-    background-color: #e9ecef; /* Lighter grey */
-    color: #383d41; /* Darker grey text */
-    text-align: left;
-    margin-right: auto;
-}
-
-/* Styles for rendered markdown (KEEP THESE AND REFINE) */
-.one-pager-panel .markdown-content {
-    line-height: 1.7; /* Increased line height for readability */
-}
-
-.one-pager-panel .markdown-content h1, /* If you use H1 in markdown */
-.one-pager-panel .markdown-content h2,
-.one-pager-panel .markdown-content h3 {
-    color: #333; /* Darker heading color */
-    margin-top: 1.5em;
-    margin-bottom: 0.6em;
-    /* font-family: 'Georgia', serif; /* Example: different font for headings */
-}
-
-.one-pager-panel .markdown-content h2 {
-    font-size: 1.6em;
-    border-bottom: 1px solid #eaeaea;
-    padding-bottom: 0.3em;
-}
-
-.one-pager-panel .markdown-content h3 {
-    font-size: 1.35em;
-}
-
-.one-pager-panel .markdown-content p {
-    margin-bottom: 1.2em; /* More space between paragraphs */
-    color: #454545; /* Slightly lighter than pure black for body text */
-}
-
-.one-pager-panel .markdown-content ul,
-.one-pager-panel .markdown-content ol {
-    margin-bottom: 1.2em;
-    padding-left: 25px; /* Slightly more padding */
-}
-
-.one-pager-panel .markdown-content li {
-    margin-bottom: 0.4em;
-}
-
-/* Add styles for other markdown elements like blockquotes, code, tables if needed */
-.initial-input-section {
-    width: 90vw;
-    max-width: 800px; /* Or match .container max-width */
-    margin: 30px auto;
-    padding: 25px;
-    background-color: white;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    border-radius: 8px;
-    text-align: center;
-}
-
-.initial-input-section h2 {
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 1.8em;
-    color: #333;
-}
-
-#one-pager-input-area {
-    width: 100%;
-    min-height: 200px; /* Adjust as needed */
-    padding: 15px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-family: sans-serif;
-    font-size: 0.95em;
-    line-height: 1.5;
-    margin-bottom: 20px;
-    box-sizing: border-box; /* Important */
-}
-
-#submit-one-pager-button {
-    padding: 12px 25px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: 500;
-    transition: background-color 0.2s ease;
-}
-
-#submit-one-pager-button:hover {
-    background-color: #0056b3;
-}
-
-#start-over-button { /* Style for the start over button */
-    padding: 8px 15px;
-    background-color: #6c757d; /* Grey */
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-}
-#start-over-button:hover {
-    background-color: #545b62;
-}
-
-/* Ensure main container styling allows it to be hidden/shown */
-.container {
-    /* ... existing styles ... */
-    /* display: flex; /* This will be set by JS when shown */
-}
+/* --- Placeholder Content Styling (Keep existing) --- */
+.placeholder-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: #6c757d; padding: 20px; }
+.placeholder-content h2 { font-size: 1.8em; margin-bottom: 15px; color: #495057; }
+.placeholder-content p { font-size: 1.1em; }
