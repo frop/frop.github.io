@@ -308,19 +308,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (briefingSendButton) { /* ... same as before ... */
+    if (briefingSendButton && briefingChatInput) { // Check both exist
         briefingSendButton.addEventListener('click', () => {
             const userInput = briefingChatInput.value.trim();
             if (userInput) {
-                    appendMessage(userInput, 'user', briefingChatMessages);
-                    briefingChatInput.value = '';
-                    sendToBriefingN8n(userInput);
+                 appendMessage(userInput, 'user', briefingChatMessages); // Manually append here
+                 briefingChatInput.value = ''; // Manually clear here
+                 sendToBriefingN8n(userInput);
             }
         });
         briefingChatInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') { /* ... */ }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const userInput = briefingChatInput.value.trim();
+                if (userInput) {
+                    appendMessage(userInput, 'user', briefingChatMessages); // Manually append here
+                    briefingChatInput.value = ''; // Manually clear here
+                    sendToBriefingN8n(userInput);
+                }
+            }
         });
     }
+
     if (briefingCopyButton) { /* ... same as before, uses currentBriefingOutputMd ... */
         briefingCopyButton.addEventListener('click', () => {
             const markdownToCopy = currentBriefingOutputMd || '';
