@@ -67,10 +67,26 @@
 
     <!-- Section for "Report" feature (Placeholder for now) -->
     <div id="report-view" class="view-section">
-        <div class="placeholder-content">
-            <h2>Report Generator</h2>
-            <p>This feature is coming soon!</p>
-            <!-- Add input fields for report generation later -->
+        <div class="container"> <!-- Use the same .container for layout -->
+            <div class="chat-panel" id="report-chat-panel">
+                <div id="report-chat-messages" class="chat-messages-area">
+                    <!-- Report chat messages will be appended here -->
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" id="report-chat-input" placeholder="Describe the report you need...">
+                    <button id="report-send-button">Send</button>
+                </div>
+            </div>
+            <div class="one-pager-panel" id="report-output-panel"> <!-- Re-using .one-pager-panel for styling consistency -->
+                <div class="panel-header">
+                    <h2 id="report-title">Generated Report</h2>
+                    <button id="report-copy-button" title="Copy Report Markdown">Copy Report</button>
+                </div>
+                <div id="report-output-content" class="markdown-content">
+                    <!-- Report Markdown will be rendered here -->
+                    <p><em>Your generated report will appear here...</em></p>
+                </div>
+            </div>
         </div>
     </div>
 

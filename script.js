@@ -8,9 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- URLs ---
     // const N8N_ONEPAGER_WEBHOOK_URL = 'http://localhost:5678/webhook/one-pager/message';
     // const N8N_BRIEFING_WEBHOOK_URL = 'http://localhost:5678/webhook/briefing/message';
+    // const N8N_REPORT_WEBHOOK_URL = 'http://localhost:5678/webhook/report/message';
     const N8N_ONEPAGER_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/one-pager/message';
     const N8N_BRIEFING_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/briefing/message';
-    // const N8N_REPORT_WEBHOOK_URL = 'YOUR_N8N_REPORT_WEBHOOK_URL_HERE'; // Placeholder
+    const N8N_REPORT_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/report/message';
 
     // --- State (Global for the app) ---
     let currentView = 'onepager'; // Default view
@@ -19,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // These module-level vars can cache the *current output* for copy buttons if needed.
     let currentOnePagerOutputMd = '';
     let currentBriefingOutputMd = '';
-
+    let currentReportOutputMd = '';
 
     // --- Initialize Session IDs (from localStorage or new) ---
     function initSessionId(viewName) {
@@ -51,6 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const briefingOutputContent = document.getElementById('briefing-output-content');
     const briefingCopyButton = document.getElementById('briefing-copy-button');
 
+    // --- Add to DOM Elements for Report View ---
+    const reportChatInput = document.getElementById('report-chat-input');
+    const reportSendButton = document.getElementById('report-send-button');
+    const reportChatMessages = document.getElementById('report-chat-messages');
+    const reportTitleElement = document.getElementById('report-title');
+    const reportOutputContent = document.getElementById('report-output-content');
+    const reportCopyButton = document.getElementById('report-copy-button');
+
     // --- Helper: Append Message to a specific chat area ---
     function appendMessage(text, sender, chatAreaElement) {
         const messageDiv = document.createElement('div');
@@ -69,7 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentOnePagerOutputMd = contentToRender; // For copy button
         } else if (viewContext === 'briefingOutput') {
             currentBriefingOutputMd = contentToRender; // For copy button
-            // No need to save briefing *output* to localStorage unless you want it to persist on refresh
+        } else if (viewContext === 'reportOutput') {
+            currentReportOutputMd = contentToRender;
         }
 
         if (contentToRender && typeof marked === 'object' && typeof marked.parse === 'function') {
@@ -82,7 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (contentToRender) {
             outputAreaElement.textContent = contentToRender;
         } else {
-            outputAreaElement.innerHTML = (viewContext === 'briefingOutput') ? '<p><em>Briefing will appear here...</em></p>' : '<p><em>Content will appear here...</em></p>';
+            let placeholder = '<p><em>Content will appear here...</em></p>';
+            if (viewContext === 'briefingOutput') placeholder = '<p><em>Briefing will appear here...</em></p>';
+            if (viewContext === 'reportOutput') placeholder = '<p><em>Your generated report will appear here...</em></p>'; // ADDED
+            outputAreaElement.innerHTML = placeholder;
         }
     }
 
@@ -148,13 +161,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 briefingOnePagerInputArea.focus();
             }
         } else if (viewId === 'report') {
-            // Placeholder for report view initialization
-            const reportOutputContent = document.getElementById('report-output-content'); // Assuming it exists
-            if(reportOutputContent) renderMarkdown(null, reportOutputContent, 'reportOutput');
-            const reportChatMessages = document.getElementById('report-chat-messages');
-            if(reportChatMessages && reportChatMessages.innerHTML.trim() === '') {
-                    appendMessage("Report feature coming soon. Define inputs and tell me what to generate!", 'bot', reportChatMessages);
+            // renderMarkdown(null, reportOutputContent, 'reportOutput'); // Clear previous report output
+            if (reportChatMessages && reportChatMessages.innerHTML.trim() === '') {
+                reportChatMessages.innerHTML = ''; // Clear chat if switching
+                const activeOnePager = localStorage.getItem('onePagerActiveContent');
+                if (activeOnePager) {
+                    // Extract a title or snippet for display if possible (simple version here)
+                    const titleSnippet = activeOnePager.split('\\n')[0].replace(/^##\s*/, '').substring(0, 30);
+                    appendMessage(`Using active one-pager ("${titleSnippet}..."). Describe the report you need based on this document.`, 'bot', reportChatMessages);
+                } else {
+                    appendMessage("No active one-pager found. Describe the report you need (you might be prompted for more details or to create a one-pager first).", 'bot', reportChatMessages);
+                }
             }
+            if (reportChatInput) reportChatInput.focus();
         }
         console.log("Active view set to:", currentView, "with session ID:", sessionIds[currentView]);
     }
@@ -201,7 +220,13 @@ document.addEventListener('DOMContentLoaded', () => {
             briefingTitleElement.textContent = 'Generated Briefing';
             briefingOnePagerInputArea.focus();
         } else if (currentView === 'report') {
-            // Reset report view
+            currentReportOutputMd = ''; // Clear cached report markdown
+            if (reportChatMessages) reportChatMessages.innerHTML = '';
+            renderMarkdown(null, reportOutputContent, 'reportOutput');
+            // You might want to send an initial message to your report n8n workflow
+            // sendMessageToReportN8n("start_report_session"); // If applicable
+            appendMessage("New report session started. Describe the report you need.", 'bot', reportChatMessages);
+            if (reportChatInput) reportChatInput.focus();
         }
     });
 
@@ -291,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (briefingSubmitOnePagerButton) { /* ... same as before ... */
+    if (briefingSubmitOnePagerButton) {
         briefingSubmitOnePagerButton.addEventListener('click', () => {
             const onePagerContent = briefingOnePagerInputArea.value.trim();
             if (!onePagerContent) { alert("Please paste one-pager content."); return; }
@@ -338,8 +363,92 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Report Feature Logic (Placeholder) ---
-    // TODO: Implement when ready
+    // --- Report Feature Logic ---
+    async function sendToReportN8n(userInput) {
+        const activeOnePager = localStorage.getItem('onePagerActiveContent');
+
+        const payload = {
+            userInput: userInput,
+            sessionId: sessionIds.report,
+            onePagerSourceContent: activeOnePager || null
+        };
+
+        reportSendButton.disabled = true; reportSendButton.textContent = 'Generating...';
+        if(reportChatInput) reportChatInput.disabled = true;
+
+        try {
+            const response = await fetch(N8N_REPORT_WEBHOOK_URL, { // Ensure N8N_REPORT_WEBHOOK_URL is defined
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`N8N Report Error ${response.status}: ${errorText}`);
+            }
+            const data = await response.json();
+
+            if (data.chatReply) appendMessage(data.chatReply, 'bot', reportChatMessages);
+            if (data.reportTitle) reportTitleElement.textContent = data.reportTitle;
+            if (data.reportContent !== undefined) renderMarkdown(data.reportContent, reportOutputContent, 'reportOutput');
+
+        } catch (error) {
+            console.error("Error in sendToReportN8n:", error);
+            appendMessage(`Error with Report assistant: ${error.message}`, 'bot', reportChatMessages);
+        } finally {
+            reportSendButton.disabled = false; reportSendButton.textContent = 'Generate Report';
+            if(reportChatInput) {
+                reportChatInput.disabled = false;
+                reportChatInput.focus();
+            }
+        }
+    }
+
+    if (reportSendButton && reportChatInput) {
+        reportSendButton.addEventListener('click', () => {
+            const userInput = reportChatInput.value.trim();
+            if (userInput) {
+                appendMessage(userInput, 'user', reportChatMessages);
+                reportChatInput.value = '';
+                sendToReportN8n(userInput); // Call the placeholder (or future implemented) function
+            }
+        });
+        reportChatInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const userInput = reportChatInput.value.trim();
+                if (userInput) {
+                    appendMessage(userInput, 'user', reportChatMessages);
+                    reportChatInput.value = '';
+                    sendToReportN8n(userInput);
+                }
+            }
+        });
+    }
+
+    if (reportCopyButton) {
+        reportCopyButton.addEventListener('click', () => {
+            const markdownToCopy = currentReportOutputMd || '';
+            if (!markdownToCopy) {
+                reportCopyButton.textContent = 'Nothing to Copy';
+                setTimeout(() => { reportCopyButton.textContent = 'Copy Report'; }, 1000);
+                return;
+            }
+            navigator.clipboard.writeText(markdownToCopy).then(() => {
+                const originalText = 'Copy Report';
+                reportCopyButton.textContent = 'Copied!';
+                reportCopyButton.classList.add('copied'); // Assuming you have .copied style
+                setTimeout(() => {
+                    reportCopyButton.textContent = originalText;
+                    reportCopyButton.classList.remove('copied');
+                }, 1500);
+            }).catch(err => {
+                console.error('Failed to copy report: ', err);
+                alert('Could not copy report.');
+            });
+        });
+    }
 
     // --- Initial App Load ---
     // Initialize all session IDs
