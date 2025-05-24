@@ -10,13 +10,25 @@
     <div class="app-header">
         <div class="app-title">AI Document Assistant</div>
         <nav class="app-nav">
+            <a href="#mydocuments" id="nav-mydocuments" class="nav-link">My Documents</a>
             <a href="#onepager" id="nav-onepager" class="nav-link active">One Pager</a>
             <a href="#briefing" id="nav-briefing" class="nav-link">Briefing</a>
             <a href="#report" id="nav-report" class="nav-link">Report</a>
         </nav>
         <div class="app-controls">
             <!-- This button might be dynamic or we add more later -->
-            <button id="new-session-button">New Session</button>
+            <button id="new-document-button">New Document</button>
+        </div>
+    </div>
+
+    <div id="mydocuments-view" class="view-section">
+        <div class="documents-list-container">
+            <h2>My Saved One-Pagers</h2>
+            <div id="loading-documents-message" style="display:none;">Loading documents...</div>
+            <ul id="documents-list">
+                
+            </ul>
+            <p id="no-documents-message" style="display:none;">You haven't saved any one-pagers yet.</p>
         </div>
     </div>
 
@@ -33,7 +45,10 @@
             <div class="one-pager-panel" id="one-pager-output-panel">
                 <div class="panel-header">
                     <h2>Project One-Pager</h2>
-                    <button id="one-pager-copy-button" title="Copy One-Pager Markdown">Copy to Clipboard</button>
+                    <div class="panel-header-controls">
+                        <button id="one-pager-save-button" title="Save One-Pager">Save One Pager</button>
+                        <button id="one-pager-copy-button" title="Copy One-Pager Markdown">Copy to Clipboard</button>
+                    </div>
                 </div>
                 <div id="one-pager-output-content" class="markdown-content"></div>
             </div>
@@ -58,7 +73,7 @@
             <div class="one-pager-panel" id="briefing-output-panel"> <!-- Re-using class, specific ID -->
                 <div class="panel-header">
                     <h2 id="briefing-title">Generated Briefing</h2>
-                    <button id="briefing-copy-button" title="Copy Briefing Markdown">Copy Briefing</button>
+                    <button id="briefing-copy-button" title="Copy Briefing Markdown">Copy to Clipboard</button>
                 </div>
                 <div id="briefing-output-content" class="markdown-content"></div>
             </div>
@@ -80,7 +95,7 @@
             <div class="one-pager-panel" id="report-output-panel"> <!-- Re-using .one-pager-panel for styling consistency -->
                 <div class="panel-header">
                     <h2 id="report-title">Generated Report</h2>
-                    <button id="report-copy-button" title="Copy Report Markdown">Copy Report</button>
+                    <button id="report-copy-button" title="Copy Report Markdown">Copy to Clipboard</button>
                 </div>
                 <div id="report-output-content" class="markdown-content">
                     <!-- Report Markdown will be rendered here -->

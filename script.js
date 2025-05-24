@@ -2,36 +2,60 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Get Common DOM Elements ---
     const navLinks = document.querySelectorAll('.nav-link');
     const views = document.querySelectorAll('.view-section');
-    const newSessionButton = document.getElementById('new-session-button');
+    const newDocumentButton = document.getElementById('new-document-button');
     const appTitle = document.querySelector('.app-title');
 
-    // --- URLs ---
-    // const N8N_ONEPAGER_WEBHOOK_URL = 'http://localhost:5678/webhook/one-pager/message';
-    // const N8N_BRIEFING_WEBHOOK_URL = 'http://localhost:5678/webhook/briefing/message';
-    // const N8N_REPORT_WEBHOOK_URL = 'http://localhost:5678/webhook/report/message';
-    const N8N_ONEPAGER_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/one-pager/message';
-    const N8N_BRIEFING_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/briefing/message';
-    const N8N_REPORT_WEBHOOK_URL = 'https://fpisa.app.n8n.cloud/webhook/report/message';
+    const USER_ID = 'frop';
+    
+    const N8N_LIST_DOCUMENTS_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5678/webhook/mydocuments' 
+        : 'https://fpisa.app.n8n.cloud/webhook/mydocuments';
+
+    const N8N_GET_DOCUMENT_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5678/webhook/mydocument' 
+        : 'https://fpisa.app.n8n.cloud/webhook/mydocument';
+
+    const N8N_ONEPAGER_WEBHOOK_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5678/webhook/one-pager/message' 
+        : 'https://fpisa.app.n8n.cloud/webhook/one-pager/message';
+
+    const N8N_ONEPAGER_SAVE_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5678/webhook/one-pager/save' 
+        : 'https://fpisa.app.n8n.cloud/webhook/one-pager/save';
+
+    const N8N_BRIEFING_WEBHOOK_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5678/webhook/briefing/message' 
+        : 'https://fpisa.app.n8n.cloud/webhook/briefing/message';
+
+    const N8N_REPORT_WEBHOOK_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5678/webhook/report/message' 
+        : 'https://fpisa.app.n8n.cloud/webhook/report/message';
 
     // --- State (Global for the app) ---
     let currentView = 'onepager'; // Default view
-    let sessionIds = { onepager: null, briefing: null, report: null };
+    let documentIds = { onepager: null, briefing: null, report: null };
     // We will primarily use localStorage for content persistence.
     // These module-level vars can cache the *current output* for copy buttons if needed.
     let currentOnePagerOutputMd = '';
     let currentBriefingOutputMd = '';
     let currentReportOutputMd = '';
 
-    // --- Initialize Session IDs (from localStorage or new) ---
-    function initSessionId(viewName) {
-        let storedId = localStorage.getItem(`${viewName}SessionId`);
+    // --- Initialize document IDs (from localStorage or new) ---
+    function initDocumentId(viewName) {
+        let storedId = localStorage.getItem(`${viewName}DocumentId`);
         if (!storedId) {
-            storedId = `${viewName}_session_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-            localStorage.setItem(`${viewName}SessionId`, storedId);
+            storedId = `${viewName}_document_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem(`${viewName}DocumentId`, storedId);
         }
-        sessionIds[viewName] = storedId;
-        console.log(`Initialized/Loaded ${viewName} session ID: ${sessionIds[viewName]}`);
+        documentIds[viewName] = storedId;
+        console.log(`Initialized/Loaded ${viewName} document ID: ${documentIds[viewName]}`);
     }
+
+    // --- DOM Elements for My Documents View ---
+    const myDocumentsView = document.getElementById('mydocuments-view'); // The view itself
+    const documentsListUL = document.getElementById('documents-list');
+    const loadingDocumentsMessage = document.getElementById('loading-documents-message');
+    const noDocumentsMessage = document.getElementById('no-documents-message');
 
     // --- DOM Elements for One-Pager View ---
     const onePagerChatInput = document.getElementById('one-pager-chat-input');
@@ -39,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const onePagerChatMessages = document.getElementById('one-pager-chat-messages');
     const onePagerOutputContent = document.getElementById('one-pager-output-content');
     const onePagerCopyButton = document.getElementById('one-pager-copy-button');
+    const onePagerSaveButton = document.getElementById('one-pager-save-button');
 
     // --- DOM Elements for Briefing View ---
     const briefingInputSection = document.getElementById('briefing-input-one-pager-section');
@@ -116,15 +141,16 @@ document.addEventListener('DOMContentLoaded', () => {
         currentView = viewId;
         appTitle.textContent = `AI Document Assistant - ${viewId.charAt(0).toUpperCase() + viewId.slice(1)}`;
 
-        if (!sessionIds[currentView]) {
-            initSessionId(currentView);
+        if (!documentIds[currentView]) {
+            initDocumentId(currentView);
         }
 
-        // View-specific setup
-        if (viewId === 'onepager') {
+        if (viewId === 'mydocuments') {
+            fetchAndDisplayUserDocuments();
+        } else if (viewId === 'onepager') {
             const activeOnePagerMd = localStorage.getItem('onePagerActiveContent');
             renderMarkdown(activeOnePagerMd, onePagerOutputContent, 'onePagerActive');
-            // Chat history for onepager is tied to its sessionId and AI Agent memory.
+            // Chat history for onepager is tied to its documentId and AI Agent memory.
             // On refresh, chat UI is blank but AI memory (hopefully) persists.
             if (onePagerChatMessages.innerHTML.trim() === '') {
                 onePagerChatMessages.innerHTML = ''; // Clear if switching, might have old view's message
@@ -175,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (reportChatInput) reportChatInput.focus();
         }
-        console.log("Active view set to:", currentView, "with session ID:", sessionIds[currentView]);
+        console.log("Active view set to:", currentView, "with document ID:", documentIds[currentView]);
     }
 
     navLinks.forEach(link => {
@@ -194,42 +220,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- New Session Button Logic ---
-    newSessionButton.addEventListener('click', () => {
-        console.log(`New Session clicked for view: ${currentView}`);
-        const newId = `${currentView}_session_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem(`${currentView}SessionId`, newId);
-        sessionIds[currentView] = newId;
-        console.log(`New ${currentView} session ID: ${sessionIds[currentView]}`);
+    // --- New Document Button Logic ---
+    newDocumentButton.addEventListener('click', () => {
+        console.log(`New Document clicked for view: ${currentView}`);
+        const newId = `${currentView}_document_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem(`${currentView}DocumentId`, newId);
+        localStorage.removeItem('onePagerActiveContent');
+        localStorage.removeItem('briefingOriginalOnePager');
+        localStorage.removeItem('reportActiveContent');
 
-        if (currentView === 'onepager') {
-            localStorage.removeItem('onePagerActiveContent');
-            onePagerChatMessages.innerHTML = '';
-            renderMarkdown(null, onePagerOutputContent, 'onePagerActive');
-            sendMessageToOnePagerN8n("start");
-            onePagerChatInput.focus();
-        } else if (currentView === 'briefing') {
-            localStorage.removeItem('briefingOriginalOnePager');
-            localStorage.removeItem('onePagerActiveContent'); // Also clear this so briefing doesn't pick it up
-            currentBriefingOutputMd = ''; // Clear the briefing output cache
-            briefingChatMessages.innerHTML = '';
-            renderMarkdown(null, briefingOutputContent, 'briefingOutput');
-            briefingOnePagerInputArea.value = '';
-            briefingInputSection.style.display = 'block';
-            briefingMainUI.style.display = 'none';
-            briefingTitleElement.textContent = 'Generated Briefing';
-            briefingOnePagerInputArea.focus();
-        } else if (currentView === 'report') {
-            currentReportOutputMd = ''; // Clear cached report markdown
-            if (reportChatMessages) reportChatMessages.innerHTML = '';
-            renderMarkdown(null, reportOutputContent, 'reportOutput');
-            // You might want to send an initial message to your report n8n workflow
-            // sendMessageToReportN8n("start_report_session"); // If applicable
-            appendMessage("New report session started. Describe the report you need.", 'bot', reportChatMessages);
-            if (reportChatInput) reportChatInput.focus();
+        documentIds[currentView] = newId;
+        console.log(`New ${currentView} document ID: ${documentIds[currentView]}`);
+
+        if (onePagerChatMessages) onePagerChatMessages.innerHTML = '';
+        renderMarkdown(null, onePagerOutputContent, 'onePagerActive');
+        sendMessageToOnePagerN8n("start"); // This will use the new documentIds.onepager
+    
+        // Switch to onepager view if not already there
+        if (currentView !== 'onepager') {
+            setActiveView('onepager');
+            window.location.hash = 'onepager';
+        } else {
+            // If already on onepager view, just ensure focus
+            if (onePagerChatInput) onePagerChatInput.focus();
         }
     });
-
 
     // --- One-Pager Feature Logic ---
     async function sendMessageToOnePagerN8n(userInput) {
@@ -242,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(N8N_ONEPAGER_WEBHOOK_URL, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ userInput: userInput, sessionId: sessionIds.onepager })
+                body: JSON.stringify({ userInput: userInput, documentId: documentIds.onepager })
             });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -292,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const payload = {
             userInput: userInput,
-            sessionId: sessionIds.briefing,
+            documentId: documentIds.briefing,
             originalOnePagerContent: originalOnePager
         };
 
@@ -321,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const onePagerContent = briefingOnePagerInputArea.value.trim();
             if (!onePagerContent) { alert("Please paste one-pager content."); return; }
             localStorage.setItem('briefingOriginalOnePager', onePagerContent);
-            if (!sessionIds.briefing) initSessionId('briefing');
+            if (!documentIds.briefing) initDocumentId('briefing');
 
             briefingInputSection.style.display = 'none';
             briefingMainUI.style.display = 'flex';
@@ -369,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const payload = {
             userInput: userInput,
-            sessionId: sessionIds.report,
+            documentId: documentIds.report,
             onePagerSourceContent: activeOnePager || null
         };
 
@@ -450,9 +465,165 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    if (onePagerSaveButton) {
+        onePagerSaveButton.addEventListener('click', async () => {
+            const onePagerContentToSave = localStorage.getItem('onePagerActiveContent');
+
+            if (!onePagerContentToSave || onePagerContentToSave.trim() === '') {
+                appendMessage("Nothing to save. Please generate or refine a one-pager first.", 'bot', onePagerChatMessages);
+                return;
+            }
+
+            const documentName = window.prompt("Enter a name for this one-pager (e.g., 'Project Phoenix Q3 Plan'):", "My One-Pager");
+
+            if (!documentName || documentName.trim() === '') {
+                appendMessage("Save cancelled. No name provided.", 'bot', onePagerChatMessages);
+                return;
+            }
+
+            const originalButtonText = onePagerSaveButton.textContent;
+            onePagerSaveButton.textContent = 'Saving...';
+            onePagerSaveButton.disabled = true;
+            onePagerSaveButton.classList.add('saving');
+
+            try {
+                const payload = {
+                    name: documentName.trim(),
+                    content: onePagerContentToSave,
+                    userId: USER_ID,
+                    documentId: documentIds.onepager
+                };
+                console.log("Sending to save one-pager:", payload.name);
+
+                const response = await fetch(N8N_ONEPAGER_SAVE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json(); // Assuming n8n sends JSON errors
+                    throw new Error(errorData.message || `Failed to save. Server responded with ${response.status}`);
+                }
+
+                const result = await response.json();
+                appendMessage(result.message || "One-pager saved successfully!", 'bot', onePagerChatMessages);
+                console.log("Save result:", result);
+
+            } catch (error) {
+                console.error("Error saving one-pager:", error);
+                appendMessage(`Error: ${error.message || 'Could not save the one-pager.'}`, 'bot', onePagerChatMessages);
+            } finally {
+                onePagerSaveButton.textContent = originalButtonText;
+                onePagerSaveButton.disabled = false;
+                onePagerSaveButton.classList.remove('saving');
+            }
+        });
+    }
+
+    async function fetchAndDisplayUserDocuments() {
+        documentsListUL.innerHTML = '';
+        loadingDocumentsMessage.style.display = 'block';
+        noDocumentsMessage.style.display = 'none';
+
+        try {
+            const payload = { userId: USER_ID };
+            console.log("Fetching documents for user:", USER_ID);
+
+            const response = await fetch(N8N_LIST_DOCUMENTS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            loadingDocumentsMessage.style.display = 'none';
+
+            // --- DEBUGGING STARTS HERE ---
+            const rawResponseText = await response.clone().text(); // Clone to read body twice
+
+            if (!response.ok) {
+                throw new Error(`Failed to load documents: ${response.status} ${rawResponseText}`);
+            }
+
+            const documentsData = await response.json(); // Changed variable name for clarity
+
+            if (documentsData && documentsData.length > 0) {
+                documentsData.forEach(doc => { // Iterate over the correct array
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `
+                        <span class="doc-name">${doc.DocumentName || 'Untitled Document'}</span>
+                        <span class="doc-meta">${doc.SavedAt ? new Date(doc.SavedAt).toLocaleString() : 'N/A'}</span>
+                    `;
+                    listItem.dataset.docid = doc.DocumentID;
+                    // If list response includes full content, store it too:
+                    // listItem.dataset.doccontent = doc.Content; // Note: 'Content' not 'content' from your example
+
+                    // Pass the actual 'Content' field
+                    listItem.addEventListener('click', () => loadDocumentIntoEditor(doc.DocumentID, doc.Content));
+                    documentsListUL.appendChild(listItem);
+                });
+            } else {
+                noDocumentsMessage.style.display = 'block';
+            }
+
+        } catch (error) {
+            console.error("Error fetching documents:", error);
+            loadingDocumentsMessage.style.display = 'none';
+            documentsListUL.innerHTML = `<li>Error loading documents: ${error.message}</li>`;
+        }
+    }
+
+    async function loadDocumentIntoEditor(documentId, contentFromList = null) {
+        console.log("Request to load document:", documentId);
+        appendMessage("Loading selected document...", 'bot', onePagerChatMessages); // Give feedback in onepager chat
+    
+        let documentContent = contentFromList;
+    
+        if (!documentContent) { // If full content wasn't in the list, fetch it
+            try {
+                const payload = { userId: USER_ID, documentId: documentId };
+                const response = await fetch(N8N_GET_DOCUMENT_URL, {
+                     method: 'POST', headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error("Failed to fetch document content.");
+                const docData = await response.json();
+                documentContent = docData.content; // Assuming n8n returns { content: "..." }
+            } catch (error) {
+                console.error("Error fetching full document content:", error);
+                appendMessage(`Error loading document: ${error.message}`, 'bot', onePagerChatMessages);
+                setActiveView('mydocuments'); // Go back to list on error
+                return;
+            }
+        }
+    
+        if (documentContent) {
+            localStorage.setItem('onePagerActiveDocumentID', documentId); // Store ID of active doc
+            localStorage.setItem('onePagerActiveContent', documentContent);
+    
+            // Create a new session ID for the onepager view for this loaded document
+            // This ensures the AI's memory for onepager is fresh for this document.
+            const newOnePagerSessionId = `onepager_session_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem(`onepagerSessionId`, newOnePagerSessionId);
+            documentIds.onepager = newOnePagerSessionId;
+            console.log(`New onepager session for loaded doc ${documentId}: ${documentIds.onepager}`);
+    
+            // Clear current chat and render
+            if (onePagerChatMessages) onePagerChatMessages.innerHTML = '';
+            renderMarkdown(documentContent, onePagerOutputContent, 'onePagerActive'); // Renders and saves to onePagerActiveContent again
+            appendMessage(`Loaded document: "${documentId.substring(0,10)}...". You can now refine it.`, 'bot', onePagerChatMessages);
+    
+            setActiveView('onepager'); // Switch to the onepager editor view
+            window.location.hash = 'onepager'; // Update hash
+        } else {
+            appendMessage("Could not load document content.", 'bot', onePagerChatMessages);
+            setActiveView('mydocuments');
+        }
+    }
+
     // --- Initial App Load ---
-    // Initialize all session IDs
-    ['onepager', 'briefing', 'report'].forEach(viewName => initSessionId(viewName));
+    // Initialize all document IDs
+    ['onepager', 'briefing', 'report'].forEach(viewName => initDocumentId(viewName));
 
     // Set view based on URL hash or default to 'onepager'
     const initialHash = window.location.hash.substring(1);
