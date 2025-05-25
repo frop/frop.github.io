@@ -304,10 +304,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const data = await response.json();
             if (data.chatReply) appendMessage(data.chatReply, 'bot', onePagerChatMessages);
-            if (data.onePagerContent !== undefined) {
-                // This updates localStorage['onePagerActiveContent']
+            // --- CRUCIAL CHANGE HERE ---
+            // Only update and re-render if new, non-empty content is provided by the AI.
+            // Also, consider if data.onePagerContent might be explicitly null from the AI.
+            if (data.onePagerContent && data.onePagerContent.trim() !== "") {
+                // AI provided new, non-empty content. Update and render.
                 renderMarkdown(data.onePagerContent, onePagerOutputContent, 'onePagerActive');
+            } else if (data.hasOwnProperty('onePagerContent') && data.onePagerContent === "") {
+                // AI explicitly returned an empty string for onePagerContent.
+                // This means it likely couldn't perform the edit or it's an error state.
+                // We do NOT update localStorage or re-render with empty content.
+                // The existing content in onePagerOutputContent remains.
+                // The chatReply should explain the situation.
+                console.warn("AI returned empty onePagerContent. UI content not changed.");
+                // Optionally, add a specific message if chatReply itself isn't enough:
+                // appendMessage("I couldn't make that change. Please try rephrasing your request or be more specific.", 'bot', onePagerChatMessages);
             }
+            // If data.onePagerContent is undefined or null, renderMarkdown will handle it by showing placeholder or not changing.
+            // But the key is not to save empty string to localStorage if it was a failed edit.
         } catch (error) {
             console.error("Error in sendMessageToOnePagerN8n:", error);
             appendMessage(`Error with One Pager assistant: ${error.message}`, 'bot', onePagerChatMessages);
