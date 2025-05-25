@@ -41,15 +41,23 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentReportOutputMd = '';
 
     // --- Initialize document IDs (from localStorage or new) ---
-    function initDocumentId(viewName) {
-        let storedId = localStorage.getItem(`${viewName}DocumentId`);
-        if (!storedId) {
-            storedId = `${viewName}_document_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-            localStorage.setItem(`${viewName}DocumentId`, storedId);
+    function initDocumentId(viewName, forceSpecificId = null) {
+        let key = `${viewName}DocumentId`;
+        let idToUse = forceSpecificId;
+    
+        if (!idToUse) { // If not forcing a specific ID, try to load from localStorage
+            idToUse = localStorage.getItem(key);
         }
-        documentIds[viewName] = storedId;
-        console.log(`Initialized/Loaded ${viewName} document ID: ${documentIds[viewName]}`);
+    
+        if (!idToUse) { // If still no ID (not in localStorage or not forced), generate new
+            idToUse = `${viewName}_document_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+        }
+        
+        localStorage.setItem(key, idToUse); // Always store/update the key for this view
+        documentIds[viewName] = idToUse;
+        console.log(`Initialized/Set ${viewName} document ID: ${documentIds[viewName]}`);
     }
+    
 
     // --- DOM Elements for My Documents View ---
     const myDocumentsView = document.getElementById('mydocuments-view'); // The view itself
@@ -222,15 +230,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- New Document Button Logic ---
     newDocumentButton.addEventListener('click', () => {
-        console.log(`New Document clicked for view: ${currentView}`);
-        const newId = `${currentView}_document_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem(`${currentView}DocumentId`, newId);
-        localStorage.removeItem('onePagerActiveContent');
+        const newDocId = `onepager_document_` + Date.now() + '_' + Math.random().toString(36).substring(2, 9); // Ensure prefix consistency if needed
+        localStorage.setItem('onePagerActiveDocumentID', newDocId);
+        localStorage.setItem('onePagerActiveContent', "");
         localStorage.removeItem('briefingOriginalOnePager');
         localStorage.removeItem('reportActiveContent');
-
-        documentIds[currentView] = newId;
-        console.log(`New ${currentView} document ID: ${documentIds[currentView]}`);
+    
+        initDocumentId('onepager', newDocId); // Set the 'onepager' view's working DocumentID
 
         if (onePagerChatMessages) onePagerChatMessages.innerHTML = '';
         renderMarkdown(null, onePagerOutputContent, 'onePagerActive');
@@ -247,17 +253,50 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- One-Pager Feature Logic ---
-    async function sendMessageToOnePagerN8n(userInput) {
-        if (userInput.toLowerCase() !== "start" && !userInput.startsWith("Active one-pager loaded")) {
+    async function sendMessageToOnePagerN8n(userInput, explicitDocumentToLoad = null) { // Added explicitDocumentToLoad
+        if (userInput.toLowerCase() !== "start" && userInput.toUpperCase() !== "LOAD_DOCUMENT_CONTENT") { // Avoid echoing system messages
             appendMessage(userInput, 'user', onePagerChatMessages);
         }
-        onePagerChatInput.value = '';
+        if (userInput.toUpperCase() !== "LOAD_DOCUMENT_CONTENT") {
+             onePagerChatInput.value = '';
+        }
+
         onePagerSendButton.disabled = true; onePagerSendButton.textContent = 'Processing...';
+        if(onePagerChatInput) onePagerChatInput.disabled = true;
+
+
+        const payload = {
+            userInput: userInput,
+            documentId: documentIds.onepager // This is the active document's ID
+        };
+
+        if (userInput.toUpperCase() === "LOAD_DOCUMENT_CONTENT" && explicitDocumentToLoad) {
+            payload.documentContentToLoad = explicitDocumentToLoad; // For priming n8n AI agent
+        } else if (userInput.toLowerCase() !== "start") {
+            // For any refinement or other commands, send the current document content
+            const currentActiveContent = localStorage.getItem('onePagerActiveContent');
+            if (currentActiveContent) {
+                payload.currentDocumentContent = currentActiveContent;
+            } else {
+                // If for some reason active content is gone, AI will have to deal with it
+                payload.currentDocumentContent = ""; // Send empty string if null
+                console.warn("Sending onepager request without active content in localStorage for refinement.");
+            }
+        }
+        // If userInput is "start", currentDocumentContent might be empty or contain previous work.
+        // The n8n prompt needs to handle "start" with existing content vs. "start" with empty content.
+        // For "start" with existing content, we should also send it.
+        else if (userInput.toLowerCase() === "start") {
+             payload.currentDocumentContent = localStorage.getItem('onePagerActiveContent') || "";
+        }
+
+
+        console.log("Sending to OnePager N8N:", payload);
 
         try {
             const response = await fetch(N8N_ONEPAGER_WEBHOOK_URL, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ userInput: userInput, documentId: documentIds.onepager })
+                body: JSON.stringify(payload)
             });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -265,13 +304,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const data = await response.json();
             if (data.chatReply) appendMessage(data.chatReply, 'bot', onePagerChatMessages);
-            if (data.onePagerContent !== undefined) renderMarkdown(data.onePagerContent, onePagerOutputContent, 'onePagerActive');
+            if (data.onePagerContent !== undefined) {
+                // This updates localStorage['onePagerActiveContent']
+                renderMarkdown(data.onePagerContent, onePagerOutputContent, 'onePagerActive');
+            }
         } catch (error) {
             console.error("Error in sendMessageToOnePagerN8n:", error);
             appendMessage(`Error with One Pager assistant: ${error.message}`, 'bot', onePagerChatMessages);
         } finally {
             onePagerSendButton.disabled = false; onePagerSendButton.textContent = 'Send';
-            onePagerChatInput.focus();
+            if(onePagerChatInput) {
+                onePagerChatInput.disabled = false;
+                if (userInput.toUpperCase() !== "LOAD_DOCUMENT_CONTENT") {
+                    onePagerChatInput.focus();
+                }
+            }
         }
     }
 
@@ -598,23 +645,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     
         if (documentContent) {
-            localStorage.setItem('onePagerActiveDocumentID', documentId); // Store ID of active doc
+            localStorage.setItem('onePagerActiveDocumentID', documentId); // Tracks THE active doc
             localStorage.setItem('onePagerActiveContent', documentContent);
     
-            // Create a new session ID for the onepager view for this loaded document
-            // This ensures the AI's memory for onepager is fresh for this document.
-            const newOnePagerSessionId = `onepager_session_` + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-            localStorage.setItem(`onepagerSessionId`, newOnePagerSessionId);
-            documentIds.onepager = newOnePagerSessionId;
-            console.log(`New onepager session for loaded doc ${documentId}: ${documentIds.onepager}`);
+            // Set the 'onepager' view's working DocumentID to this specific documentId
+            initDocumentId('onepager', documentId); // This now sets documentIds.onepager = documentId
     
-            // Clear current chat and render
-            if (onePagerChatMessages) onePagerChatMessages.innerHTML = '';
-            renderMarkdown(documentContent, onePagerOutputContent, 'onePagerActive'); // Renders and saves to onePagerActiveContent again
-            appendMessage(`Loaded document: "${documentId.substring(0,10)}...". You can now refine it.`, 'bot', onePagerChatMessages);
-    
-            setActiveView('onepager'); // Switch to the onepager editor view
-            window.location.hash = 'onepager'; // Update hash
+            setActiveView('onepager');
+            window.location.hash = 'onepager';
+            sendMessageToOnePagerN8n("LOAD_DOCUMENT_CONTENT", documentContent);
         } else {
             appendMessage("Could not load document content.", 'bot', onePagerChatMessages);
             setActiveView('mydocuments');
@@ -622,14 +661,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Initial App Load ---
-    // Initialize all document IDs
-    ['onepager', 'briefing', 'report'].forEach(viewName => initDocumentId(viewName));
+    // Initialize all document IDs (generic ones first)
+    ['briefing', 'report'].forEach(viewName => initDocumentId(viewName)); // Keep these generic for now
+
+    // Specifically for 'onepager', try to load the *active* document's ID
+    let activeOnePagerDocId = localStorage.getItem('onePagerActiveDocumentID');
+    if (activeOnePagerDocId) {
+        initDocumentId('onepager', activeOnePagerDocId);
+        console.log(`Loaded active onepager Document ID from localStorage: ${documentIds.onepager}`);
+    } else {
+        // If no active one-pager ID, then initialize a generic one
+        initDocumentId('onepager');
+    }
 
     // Set view based on URL hash or default to 'onepager'
     const initialHash = window.location.hash.substring(1);
-    const validViews = ['onepager', 'briefing', 'report'];
+    const validViews = ['onepager', 'briefing', 'report', 'mydocuments']; // Added mydocuments
     const viewToLoad = validViews.includes(initialHash) ? initialHash : 'onepager';
-    setActiveView(viewToLoad); // This will also load content for the active view
+    setActiveView(viewToLoad);// This will also load content for the active view
 
     // Listen for hash changes to update view (e.g., if user uses browser back/forward)
     window.addEventListener('hashchange', () => {
